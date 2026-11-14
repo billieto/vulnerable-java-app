@@ -1,6 +1,8 @@
 package com.example.vulnerable;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.apache.camel.component.extension.verifier.IllegalOptionException;
 import org.springframework.web.bind.annotation.*;
 import org.w3c.dom.Document;
 import org.yaml.snakeyaml.Yaml;
@@ -28,6 +30,8 @@ public class VulnerableController {
 
     // In-memory user store (simulating database)
     private static final List<Map<String, Object>> users = new ArrayList<>();
+
+    private static final Set<String> ALLOWED_COMMANDS_SET = Set.of("ls -la", "ls -l", "cat README.md", "cat LICENSE");
 
     static {
         Map<String, Object> admin = new HashMap<>();
@@ -86,7 +90,7 @@ public class VulnerableController {
 
         // Vulnerable: Direct string concatenation simulating SQL injection
         String query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
-        System.out.println("Query: " + query);  // This would be vulnerable in real SQL
+        System.out.println("Query: " + query); // This would be vulnerable in real SQL
 
         Map<String, Object> response = new HashMap<>();
         for (Map<String, Object> user : users) {
@@ -109,9 +113,20 @@ public class VulnerableController {
     @GetMapping("/exec")
     public Map<String, Object> executeCommand(@RequestParam String cmd) {
         Map<String, Object> response = new HashMap<>();
+
         try {
-            // Vulnerable: User input directly in shell command
+            // Fix: Allow only certain commands to be run.
+            // The most optimal way is to have a config file with the commands allowed and
+            // make a function that initializes the set. Or having it outside the method so
+            // JiT does it's job.
+
+            if (!ALLOWED_COMMANDS_SET.contains(cmd)) {
+                throw new IllegalOptionException("You can't execute the command: \"" + cmd + "\".");
+            }
+
+            // TODO: Alla3e to se ProcessBuilder
             Process process = Runtime.getRuntime().exec(cmd);
+
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             StringBuilder output = new StringBuilder();
             String line;
@@ -146,7 +161,7 @@ public class VulnerableController {
     // VULNERABILITY: Unrestricted File Upload (CWE-434)
     @PostMapping("/upload")
     public Map<String, Object> uploadFile(@RequestParam("file") String fileContent,
-                                          @RequestParam("filename") String filename) {
+            @RequestParam("filename") String filename) {
         Map<String, Object> response = new HashMap<>();
         try {
             // Vulnerable: No file type validation, no size limits
@@ -297,7 +312,7 @@ public class VulnerableController {
         // Vulnerable: Directly assigning all properties from user input
         Map<String, Object> newUser = new HashMap<>();
         newUser.put("id", users.size() + 1);
-        newUser.putAll(userData);  // Attacker could set role: 'admin'
+        newUser.putAll(userData); // Attacker could set role: 'admin'
 
         users.add(newUser);
 
