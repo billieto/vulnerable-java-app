@@ -33,6 +33,8 @@ public class VulnerableController {
 
     private static final Set<String> ALLOWED_COMMANDS_SET = Set.of("ls -la", "ls -l", "cat README.md", "cat LICENSE");
 
+    private static final String ALLOWED_WORKING_DIRECTORY = "/a/path/that/maybe/exists/";
+
     static {
         Map<String, Object> admin = new HashMap<>();
         admin.put("id", 1);
@@ -121,7 +123,7 @@ public class VulnerableController {
             // JiT does it's job.
 
             if (!ALLOWED_COMMANDS_SET.contains(cmd)) {
-                throw new IllegalOptionException("You can't execute the command: \"" + cmd + "\".");
+                throw new SecurityException("You can't execute the command: \"" + cmd + "\".");
             }
 
             // TODO: Alla3e to se ProcessBuilder
@@ -148,12 +150,20 @@ public class VulnerableController {
     public Map<String, Object> getFile(@RequestParam String filename) {
         Map<String, Object> response = new HashMap<>();
         try {
-            // Vulnerable: No sanitization of file path
+            // Fix: Always check if the user is inside the path he is only allowed to be in.
             String filePath = System.getProperty("user.dir") + "/uploads/" + filename;
+
+            File file = new File(filePath);
+            if (!file.getCanonicalPath().startsWith(ALLOWED_WORKING_DIRECTORY)) {
+                throw new SecurityException("You can't be in the path: \"" + filePath + "\".");
+            }
+
             String content = new String(Files.readAllBytes(Paths.get(filePath)));
             response.put("content", content);
         } catch (IOException e) {
             response.put("error", "File not found");
+        } catch (SecurityException se) {
+            response.put("error", se.getMessage());
         }
         return response;
     }
