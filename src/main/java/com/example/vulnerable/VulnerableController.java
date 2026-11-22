@@ -3,6 +3,8 @@ package com.example.vulnerable;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.apache.camel.component.extension.verifier.IllegalOptionException;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.web.bind.annotation.*;
 import org.w3c.dom.Document;
 import org.yaml.snakeyaml.Yaml;
@@ -34,6 +36,10 @@ public class VulnerableController {
     private static final Set<String> ALLOWED_COMMANDS_SET = Set.of("ls -la", "ls -l", "cat README.md", "cat LICENSE");
 
     private static final String ALLOWED_WORKING_DIRECTORY = "/a/path/that/maybe/exists/";
+
+    private static final Set<String> ALLOWED_MIME_TYPES = Set.of(MediaType.IMAGE_GIF_VALUE, MediaType.IMAGE_JPEG_VALUE,
+            MediaType.IMAGE_PNG_VALUE, MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_PDF_VALUE,
+            MediaType.APPLICATION_XML_VALUE);
 
     static {
         Map<String, Object> admin = new HashMap<>();
@@ -155,7 +161,7 @@ public class VulnerableController {
 
             File file = new File(filePath);
             if (!file.getCanonicalPath().startsWith(ALLOWED_WORKING_DIRECTORY)) {
-                throw new SecurityException("You can't be in the path: \"" + filePath + "\".");
+                throw new SecurityException("You can't get: \"" + filePath + "\".");
             }
 
             String content = new String(Files.readAllBytes(Paths.get(filePath)));
@@ -174,8 +180,23 @@ public class VulnerableController {
             @RequestParam("filename") String filename) {
         Map<String, Object> response = new HashMap<>();
         try {
-            // Vulnerable: No file type validation, no size limits
+            // Fix:
+            // 1) Always check if the user is inside the path he is only allowed to be in.
+            // 2) Be sure that the file type is allowed.
+
             String uploadPath = System.getProperty("user.dir") + "/uploads/" + filename;
+
+            File file = new File(uploadPath);
+            if (!file.getCanonicalPath().startsWith(ALLOWED_WORKING_DIRECTORY)) {
+                throw new SecurityException("You can't upload in: \"" + uploadPath + "\".");
+            }
+
+            // Spring's media type class.
+            Optional<MediaType> mimeTypeOptional = MediaTypeFactory.getMediaType(file.getName());
+            if (mimeTypeOptional.isEmpty() || !ALLOWED_MIME_TYPES.contains(mimeTypeOptional.get().toString())) {
+                throw new SecurityException("You can't upload the file type: \"" + uploadPath + "\".");
+            }
+
             Files.write(Paths.get(uploadPath), fileContent.getBytes());
 
             response.put("success", true);
@@ -183,6 +204,8 @@ public class VulnerableController {
             response.put("path", uploadPath);
         } catch (IOException e) {
             response.put("error", e.getMessage());
+        } catch (SecurityException se) {
+            response.put("error", se.getMessage());
         }
         return response;
     }
