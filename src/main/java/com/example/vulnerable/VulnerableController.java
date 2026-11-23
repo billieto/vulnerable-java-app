@@ -6,6 +6,7 @@ import org.apache.camel.component.extension.verifier.IllegalOptionException;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.HtmlUtils;
 import org.w3c.dom.Document;
 import org.yaml.snakeyaml.Yaml;
 
@@ -213,8 +214,11 @@ public class VulnerableController {
     // VULNERABILITY: Cross-Site Scripting (XSS) (CWE-79)
     @GetMapping("/search")
     public String search(@RequestParam String query) {
-        // Vulnerable: Reflects user input without sanitization
-        return "<h1>Search Results for: " + query + "</h1>";
+        // Fix: encode the special characters, like '<' and '>', to their respected html
+        // escaped characters, &lt; and &gt;.
+        String sanitizedQuery = HtmlUtils.htmlEscape(query);
+
+        return "<h1>Search Results for: " + sanitizedQuery + "</h1>";
     }
 
     // VULNERABILITY: Server-Side Request Forgery (SSRF) (CWE-918)
