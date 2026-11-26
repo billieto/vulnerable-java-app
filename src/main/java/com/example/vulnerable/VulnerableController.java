@@ -1,5 +1,6 @@
 package com.example.vulnerable;
 
+import com.example.MyFilteringInputStream;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.apache.camel.component.extension.verifier.IllegalOptionException;
@@ -268,9 +269,10 @@ public class VulnerableController {
     public Map<String, Object> deserialize(@RequestBody byte[] data) {
         Map<String, Object> response = new HashMap<>();
         try {
-            // Vulnerable: Deserializing untrusted data
+            // Fix: Builded my own class that inherits ObjectInputStream and does the same
+            // job but before returning the class i check it the class name is allowed.
             ByteArrayInputStream bis = new ByteArrayInputStream(data);
-            ObjectInputStream ois = new ObjectInputStream(bis);
+            ObjectInputStream ois = new MyFilteringInputStream(bis);
             Object obj = ois.readObject();
             ois.close();
 
