@@ -17,6 +17,8 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.*;
 import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -38,6 +40,9 @@ public class VulnerableController {
     private static final Set<String> ALLOWED_COMMANDS_SET = Set.of("ls -la", "ls -l", "cat README.md", "cat LICENSE");
 
     private static final String ALLOWED_WORKING_DIRECTORY = "/a/path/that/maybe/exists/";
+
+    private static final Set<String> ALLOWED_DOMAINS = Set.of("https://facebook.com", "https://dit.uop.gr",
+            "https://stackoverflow.com");
 
     private static final Set<String> ALLOWED_MIME_TYPES = Set.of(MediaType.IMAGE_GIF_VALUE, MediaType.IMAGE_JPEG_VALUE,
             MediaType.IMAGE_PNG_VALUE, MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_PDF_VALUE,
@@ -394,8 +399,16 @@ public class VulnerableController {
     // VULNERABILITY: Open Redirect (CWE-601)
     @GetMapping("/redirect")
     public void redirect(@RequestParam String url, HttpServletResponse response) throws IOException {
-        // Vulnerable: No validation of redirect URL
-        response.sendRedirect(url);
+        // Fix: Only allow certain url redirects.
+        try {
+            if (!ALLOWED_DOMAINS.contains(url)) {
+                throw new SecurityException("Domain \" " + url + "\" is not allowed.");
+            }
+            response.sendRedirect(url);
+        } catch (SecurityException se) {
+            System.out.println(se.getMessage());
+            response.sendRedirect("/index");
+        }
     }
 
     // VULNERABILITY: Information Disclosure through Error Messages (CWE-209)
