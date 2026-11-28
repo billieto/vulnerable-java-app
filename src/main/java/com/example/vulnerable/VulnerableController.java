@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.camel.component.extension.verifier.IllegalOptionException;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.HtmlUtils;
 import org.w3c.dom.Document;
@@ -431,16 +432,13 @@ public class VulnerableController {
         Map<String, Object> response = new HashMap<>();
         try {
             String password = request.get("password");
-            // Vulnerable: Using weak hash algorithm (MD5)
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] hash = md.digest(password.getBytes());
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                hexString.append(String.format("%02x", b));
-            }
 
-            response.put("hash", hexString.toString());
-            response.put("algorithm", "MD5");
+            // Fix: Using Argon2 algorithm
+            Argon2PasswordEncoder argon2PasswordEncoder = new Argon2PasswordEncoder();
+            String hashedPassword = argon2PasswordEncoder.encode(password);
+
+            response.put("hash", hashedPassword);
+            response.put("algorithm", "Argon2id");
         } catch (Exception e) {
             response.put("error", e.getMessage());
         }
